@@ -78,15 +78,7 @@ final readonly class Application {
         $this->kernel = $kernel ?? new Kernel;
 
         $this->lifecycle = new Engine(
-            new States(
-                State::CREATED,
-                State::INITIALIZING,
-                State::INITIALIZED,
-                State::DISPOSING,
-                State::DISPOSED,
-                State::INITIALIZATION_FAILED,
-                State::DISPOSAL_FAILED
-            ),
+            State::CREATED,
             $this->kernel->dependencyBoundary()
         );
 
@@ -198,7 +190,9 @@ final readonly class Application {
      * Calling this method after successful initialization has no effect.
      * @since 1.0.0
      *
+     * @uses \FireHub\Kernel\Lifecycle\Engine::state() To get the current state.
      * @uses \FireHub\Kernel\Lifecycle\Engine::start() To execute registered initializers.
+     * @uses \FireHub\Kernel\Lifecycle\Engine::execute() To execute a callback.
      *
      * @throws \FireHub\Application\Exception\InvalidApplicationStateException If initialization is not allowed.
      * @throws \FireHub\Application\Exception\ApplicationInitializationException If an initializer fails.
@@ -207,9 +201,18 @@ final readonly class Application {
      */
     public function initialize ():void {
 
+        if ($this->state() === State::INITIALIZED) return;
+
         try {
 
-            $this->lifecycle->start();
+            $this->lifecycle->execute(
+                callback: fn() => $this->lifecycle->start(),
+                from: [State::CREATED],
+                success: State::INITIALIZED,
+                failure: State::INITIALIZATION_FAILED,
+                entering: State::INITIALIZING,
+                acquire_parent: true
+            );
 
         } catch (InvalidLifecycleStateException $exception) {
 
@@ -241,6 +244,8 @@ final readonly class Application {
      * Calling this method after successful disposal has no effect.
      * @since 1.0.0
      *
+     * @uses \FireHub\Kernel\Lifecycle\Engine::state() To get the current state.
+     * @uses \FireHub\Kernel\Lifecycle\Engine::execute() To execute a callback.
      * @uses \FireHub\Kernel\Lifecycle\Engine::stop() To execute registered disposers.
      *
      * @throws \FireHub\Application\Exception\InvalidApplicationStateException If disposal is not allowed.
@@ -250,9 +255,24 @@ final readonly class Application {
      */
     public function dispose ():void {
 
+        if ($this->state() === State::DISPOSED) return;
+
         try {
 
-            $this->lifecycle->stop();
+            $this->lifecycle->execute(
+                callback: fn() => $this->lifecycle->stop(),
+                from: [
+                    State::CREATED,
+                    State::INITIALIZED,
+                    State::INITIALIZATION_FAILED
+                ],
+                success: State::DISPOSED,
+                failure: State::DISPOSAL_FAILED,
+                entering: State::DISPOSING,
+                acquire_parent: true,
+                release_parent: true,
+                require_no_dependents: true
+            );
 
         } catch (InvalidLifecycleStateException $exception) {
 
