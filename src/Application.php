@@ -13,7 +13,6 @@
 
 namespace FireHub\Application;
 
-use FireHub\Core\Meta\Enum\Kernel\State as KernelState;
 use FireHub\Kernel\Kernel;
 use FireHub\Kernel\Lifecycle\ {
     Engine, States
@@ -60,6 +59,8 @@ final readonly class Application {
      * ### Constructor
      * @since 1.0.0
      *
+     * @uses \FireHub\Kernel\Kernel::dependencyBoundary() To create a kernel dependency boundary.
+     *
      * @param \FireHub\Application\Context $context <p>
      * Application context.
      * </p>
@@ -81,7 +82,8 @@ final readonly class Application {
                 State::DISPOSED,
                 State::INITIALIZATION_FAILED,
                 State::DISPOSAL_FAILED
-            )
+            ),
+            $this->kernel->dependencyBoundary()
         );
 
     }
@@ -192,7 +194,6 @@ final readonly class Application {
      * Calling this method after successful initialization has no effect.
      * @since 1.0.0
      *
-     * @uses \FireHub\Application\Application::state() To get the current state.
      * @uses \FireHub\Kernel\Lifecycle\Engine::start() To execute registered initializers.
      *
      * @throws \FireHub\Application\Exception\InvalidApplicationStateException If initialization is not allowed.
@@ -201,13 +202,6 @@ final readonly class Application {
      * @return void
      */
     public function initialize ():void {
-
-        if ($this->state() === State::INITIALIZED) return;
-
-        if ($this->kernel->state() !== KernelState::BOOTED)
-            throw new InvalidApplicationStateException(
-                'The application cannot initialize before the kernel is booted.'
-            );
 
         try {
 
