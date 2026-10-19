@@ -33,7 +33,7 @@ use FireHub\Application\Exception\ {
  *
  * Application initializers and disposers are registered independently of kernel bootstrappers and terminators.
  *
- * The kernel must be booted before application initialization begins. Kernel initialization and termination remain
+ * The parent kernel must be booted before application initialization begins. Kernel initialization and termination remain
  * explicit operations and are not automatically performed by the application.
  *
  * Lifecycle failures are exposed through application-specific exceptions.
@@ -64,14 +64,18 @@ final readonly class Application {
      * @param \FireHub\Application\Context $context <p>
      * Application context.
      * </p>
+     * @param null|\FireHub\Kernel\Kernel $kernel [optional] <p>
+     * Kernel instance to share with other runtime components.
+     * </p>
      *
      * @return void
      */
     public function __construct (
-        private Context $context
+        private Context $context,
+        ?Kernel $kernel = null
     ) {
 
-        $this->kernel = new Kernel;
+        $this->kernel = $kernel ?? new Kernel;
 
         $this->lifecycle = new Engine(
             new States(
@@ -288,7 +292,7 @@ final readonly class Application {
     /**
      * ### Gets the application kernel
      *
-     * Returns the kernel responsible for managing the application lifecycle.
+     * Returns the parent kernel on which the application lifecycle depends.
      * @since 1.0.0
      *
      * @return \FireHub\Kernel\Kernel Application kernel.
