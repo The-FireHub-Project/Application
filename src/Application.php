@@ -14,9 +14,7 @@
 namespace FireHub\Application;
 
 use FireHub\Kernel\Kernel;
-use FireHub\Kernel\Lifecycle\ {
-    Engine, States
-};
+use FireHub\Kernel\Lifecycle\Engine;
 use FireHub\Kernel\Lifecycle\Exception\ {
     InvalidLifecycleStateException, LifecycleExecutionException
 };
@@ -37,6 +35,31 @@ use FireHub\Application\Exception\ {
  * explicit operations and are not automatically performed by the application.
  *
  * Lifecycle failures are exposed through application-specific exceptions.
+ *
+ * <code>
+ * use FireHub\Application\Application;
+ * use FireHub\Application\Context;
+ * use FireHub\Application\Context\Name;
+ * use FireHub\Application\Context\Environment;
+ *
+ * $app = new Application(
+ *     new Context(
+ *         new Name('FireHub'),
+ *         Environment::PRODUCTION
+ * ));
+ *
+ * $app->registerInitializer(new ClassThatImplementsInitializer);
+ * $app->registerDisposer(new ClassThatImplementsDisposer);
+ *
+ * $app->kernel()->boot();
+ * $app->initialize();
+ *
+ * // write code here
+ *
+ * $app->dispose();
+ * $app->kernel()->shutdown();
+ * </code>
+ *
  * @since 1.0.0
  */
 final readonly class Application {
@@ -91,6 +114,22 @@ final readonly class Application {
      *
      * Initializers are executed according to their configured execution order. Registration is permitted only before
      * initialization begins.
+     *
+     * <code>
+     * use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     *
+     * $app = new Application(
+     *     new Context(
+     *         new Name('FireHub'),
+     *         Environment::PRODUCTION
+     * ));
+     *
+     * $app->registerInitializer(new ClassThatImplementsInitializer);
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Kernel\Lifecycle\Engine::registerStartup() To register an initializer.
@@ -138,6 +177,22 @@ final readonly class Application {
      *
      * Disposers are executed according to their configured execution order. Registration is permitted only before
      * initialization begins.
+     *
+     * <code>
+     * use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     *
+     * $app = new Application(
+     *     new Context(
+     *         new Name('FireHub'),
+     *         Environment::PRODUCTION
+     * ));
+     *
+     * $app->registerDisposer(new ClassThatImplementsDisposer);
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Kernel\Lifecycle\Engine::registerShutdown() To register a disposer.
@@ -188,6 +243,22 @@ final readonly class Application {
      * Initialization stops immediately when an initializer fails.
      *
      * Calling this method after successful initialization has no effect.
+     *
+     * <code>
+     * use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     *
+     * $app = new Application(
+     *     new Context(
+     *         new Name('FireHub'),
+     *         Environment::PRODUCTION
+     * ));
+     *
+     * $app->initialize();
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Kernel\Lifecycle\Engine::state() To get the current state.
@@ -242,6 +313,22 @@ final readonly class Application {
      * All registered disposers are attempted even when an individual disposer fails.
      *
      * Calling this method after successful disposal has no effect.
+     *
+     * <code>
+     * use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     *
+     * $app = new Application(
+     *     new Context(
+     *         new Name('FireHub'),
+     *         Environment::PRODUCTION
+     * ));
+     *
+     * $app->dispose();
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Kernel\Lifecycle\Engine::state() To get the current state.
@@ -297,6 +384,34 @@ final readonly class Application {
      * Returns the application's own lifecycle state directly from its lifecycle engine.
      *
      * No conversion from kernel states is performed.
+     *
+     * <code>
+     *  use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     *
+     * $app = new Application(
+     *     new Context(
+     *         new Name('FireHub'),
+     *         Environment::PRODUCTION
+     * ));
+     *
+     * $app->state();
+     *
+     * // FireHub\Application\State::CREATED
+     *
+     * $app->initialize();
+     * $app->state();
+     *
+     * // FireHub\Application\State::INITIALIZED
+     *
+     * $app->dispose();
+     * $app->state();
+     *
+     * // FireHub\Application\State::DISPOSED
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Kernel\Lifecycle\Engine::state() To get the current state.
@@ -325,6 +440,28 @@ final readonly class Application {
 
     /**
      * ### Gets the application execution context
+     *
+     * <code>
+     * use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     *
+     * $app = new Application(
+     *     new Context(
+     *         new Name('FireHub'),
+     *         Environment::PRODUCTION
+     * ));
+     *
+     * $kernel->context()->name->value();
+     *
+     * // FireHub
+     *
+     * $kernel->context()->environment;
+     *
+     * // FireHub\Application\Context\Environment::PRODUCTION
+     * </code>
+     *
      * @since 1.0.0
      *
      * @return \FireHub\Application\Context Application context.
