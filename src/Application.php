@@ -13,9 +13,12 @@
 
 namespace FireHub\Application;
 
-use FireHub\Core\Boundary\Container as ContainerBoundary;
+use FireHub\Core\Boundary\ {
+    Container\Scope as ScopeBoundary, Container as ContainerBoundary
+};
 use FireHub\Kernel\Kernel;
 use FireHub\Kernel\Lifecycle\Engine;
+use FireHub\Kernel\Lifecycle\Dependency\Boundary;
 use FireHub\Container\Container;
 use FireHub\Kernel\Lifecycle\Exception\ {
     InvalidLifecycleStateException, LifecycleExecutionException
@@ -23,6 +26,7 @@ use FireHub\Kernel\Lifecycle\Exception\ {
 use FireHub\Application\Exception\ {
     ApplicationDisposalException, ApplicationInitializationException, InvalidApplicationStateException
 };
+use Closure;
 
 /**
  * ### Manages the application lifecycle
@@ -101,6 +105,27 @@ final readonly class Application {
         $this->lifecycle = new Engine(
             State::CREATED,
             $this->kernel->dependencyBoundary()
+        );
+
+    }
+
+    /**
+     * ### Gets the application lifecycle dependency boundary
+     *
+     * Exposes the application as a parent lifecycle for dependent runtime executions.
+     *
+     * Dependencies can only be acquired while the application is initialized.
+     *
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Kernel\Lifecycle\Engine::dependencyBoundary() To create the dependency boundary.
+     *
+     * @return \FireHub\Kernel\Lifecycle\Dependency\Boundary Application lifecycle dependency boundary.
+     */
+    public function dependencyBoundary ():Boundary {
+
+        return $this->lifecycle->dependencyBoundary(
+            fn (State $state):bool => $state === State::INITIALIZED
         );
 
     }
@@ -371,6 +396,59 @@ final readonly class Application {
             throw new ApplicationDisposalException(
                 previous: $exception->getPrevious() ?? $exception
             );
+
+        }
+
+    }
+
+    /**
+     * ### Executes an application operation
+     *
+     * Executes a callback within an isolated dependency injection scope.
+     *
+     * The application must be initialized before execution begins.
+     *
+     * Acquires an application lifecycle dependency to prevent disposal while the operation is active.
+     *
+     * The dependency injection scope is closed, and the lifecycle dependency is released after execution, including
+     * when the callback fails.
+     *
+     * <code>
+     * $result = $app->execute(
+     *     function () use (Container $app):void {
+     *
+     *         $test = $app->container()->get(Test::class);
+     *
+     *         return '';
+     *
+     *     }
+     * );
+     * </code>
+     *
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Application\Application::dependencyBoundary() To acquire a lifecycle dependency.
+     * @uses \FireHub\Kernel\Lifecycle\Dependency\Lease::release() To release the lifecycle dependency.
+     *
+     * @param Closure(\FireHub\Core\Boundary\Container):mixed $callback <p>
+     * Operation to execute.
+     * </p>
+     *
+     * @throws \FireHub\Kernel\Lifecycle\Exception\InvalidLifecycleStateException If the application is not available.
+     *
+     * @return mixed Operation result.
+     */
+    public function execute (Closure $callback):mixed {
+
+        $lease = $this->dependencyBoundary()->acquire();
+
+        try {
+
+            return $callback($this->container);
+
+        } finally {
+
+            $lease->release();
 
         }
 
