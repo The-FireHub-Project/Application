@@ -13,8 +13,10 @@
 
 namespace FireHub\Application;
 
+use FireHub\Core\Boundary\Container as ContainerBoundary;
 use FireHub\Kernel\Kernel;
 use FireHub\Kernel\Lifecycle\Engine;
+use FireHub\Container\Container;
 use FireHub\Kernel\Lifecycle\Exception\ {
     InvalidLifecycleStateException, LifecycleExecutionException
 };
@@ -65,12 +67,6 @@ use FireHub\Application\Exception\ {
 final readonly class Application {
 
     /**
-     * ### Application kernel
-     * @since 1.0.0
-     */
-    private Kernel $kernel;
-
-    /**
      * ### Application lifecycle engine
      * @since 1.0.0
      *
@@ -87,18 +83,20 @@ final readonly class Application {
      * @param \FireHub\Application\Context $context <p>
      * Application context.
      * </p>
-     * @param null|\FireHub\Kernel\Kernel $kernel [optional] <p>
-     * Kernel instance to share with other runtime components.
+     * @param \FireHub\Kernel\Kernel $kernel [optional] <p>
+     * Parent kernel. A new kernel is created by default.
+     * </p>
+     * @param \FireHub\Core\Boundary\Container $container [optional] <p>
+     * Application dependency injection container. A new container is created by default.
      * </p>
      *
      * @return void
      */
     public function __construct (
         private Context $context,
-        ?Kernel $kernel = null
+        private Kernel $kernel = new Kernel,
+        private ContainerBoundary $container = new Container
     ) {
-
-        $this->kernel = $kernel ?? new Kernel;
 
         $this->lifecycle = new Engine(
             State::CREATED,
@@ -469,6 +467,18 @@ final readonly class Application {
     public function context ():Context {
 
         return $this->context;
+
+    }
+
+    /**
+     * ### Gets the application dependency injection container
+     * @since 1.0.0
+     *
+     * @return \FireHub\Core\Boundary\Container Application container.
+     */
+    public function container ():ContainerBoundary {
+
+        return $this->container;
 
     }
 
