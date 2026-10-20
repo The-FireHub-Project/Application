@@ -299,18 +299,24 @@ final class Builder {
      * Creates an application using the configured context, kernel, dependency injection container, modules,
      * initializers, and disposers.
      *
-     * Module services are registered in dependency order before the application is constructed.
+     * Modules are resolved in dependency order, and their service registrations are applied before the application
+     * is constructed.
      *
-     * When the builder creates its own container, the container is automatically frozen after service registration.
+     * The module manager is cloned and frozen after successful service registration, preventing further changes
+     * to the application's module composition.
      *
-     * Externally supplied containers remain under the caller's control and are never frozen by the builder.
+     * Containers created by the builder are automatically frozen after service registration. Externally supplied
+     * containers remain under the caller's control and are never frozen by the builder.
      *
      * Building an application does not initialize its lifecycle.
      * @since 1.0.0
      *
      * @uses \FireHub\Module\Manager::ordered() To get the ordered module list.
+     * @uses \FireHub\Module\Manager::freeze() To freeze the module registry.
      * @uses \FireHub\Core\Boundary\Module\RegistersServices::register() To register services.
      * @uses \FireHub\Container\Container::freeze() To freeze the container.
+     * @uses \FireHub\Application\Application::registerInitializer() To register application initializers.
+     * @uses \FireHub\Application\Application::registerDisposer() To register application disposers.
      *
      * @throws \FireHub\Application\Exception\InvalidApplicationStateException If registration is not allowed.
      * @throws \FireHub\Module\Exception\ModuleDependencyNotFoundException If a required module is not registered.
@@ -324,23 +330,23 @@ final class Builder {
 
         $container = $this->container ?? new Container;
 
-        if ($this->modules !== null) {
+        $modules = clone ($this->modules ?? new ModuleManager);
 
-            foreach ($this->modules->ordered() as $module) {
+        foreach ($modules->ordered() as $module) {
 
-                if (!$module instanceof RegistersServices)
-                    continue;
+            if (!$module instanceof RegistersServices)
+                continue;
 
-                if (!$container instanceof Registrar)
-                    throw new ContainerRegistrationNotSupportedException(
-                        'The configured container does not support service registration.'
-                    );
+            if (!$container instanceof Registrar)
+                throw new ContainerRegistrationNotSupportedException(
+                    'The configured container does not support service registration.'
+                );
 
-                $module->register($container);
-
-            }
+            $module->register($container);
 
         }
+
+        $modules->freeze();
 
         if ($this->container === null && $container instanceof Container)
             $container->freeze();
@@ -348,7 +354,8 @@ final class Builder {
         $application = new Application(
             $this->context,
             $this->kernel ?? new Kernel,
-            $container
+            $container,
+            $modules
         );
 
         foreach ($this->initializers as $entry)

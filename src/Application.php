@@ -18,6 +18,7 @@ use FireHub\Kernel\Kernel;
 use FireHub\Kernel\Lifecycle\Engine;
 use FireHub\Kernel\Lifecycle\Dependency\Boundary;
 use FireHub\Container\Container;
+use FireHub\Module\Manager as ModuleManager;
 use FireHub\Kernel\Lifecycle\Exception\ {
     InvalidLifecycleStateException, LifecycleExecutionException
 };
@@ -91,13 +92,17 @@ final readonly class Application {
      * @param \FireHub\Core\Boundary\Container $container [optional] <p>
      * Application dependency injection container. A new container is created by default.
      * </p>
+     * @param \FireHub\Module\Manager $modules [optional] <p>
+     * Application module manager.
+     * </p>
      *
      * @return void
      */
     public function __construct (
         private Context $context,
         private Kernel $kernel = new Kernel,
-        private ContainerBoundary $container = new Container
+        private ContainerBoundary $container = new Container,
+        private ModuleManager $modules = new ModuleManager
     ) {
 
         $this->lifecycle = new Engine(
@@ -555,6 +560,22 @@ final readonly class Application {
     public function container ():ContainerBoundary {
 
         return $this->container;
+
+    }
+
+    /**
+     * ### Gets the application module manager
+     *
+     * Returns the module manager associated with this application.
+     *
+     * The manager provides access to registered modules and their dependency ordering.
+     * @since 1.0.0
+     *
+     * @return \FireHub\Module\Manager Application module manager.
+     */
+    public function modules ():ModuleManager {
+
+        return $this->modules;
 
     }
 
