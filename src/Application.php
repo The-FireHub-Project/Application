@@ -424,9 +424,11 @@ final readonly class Application {
      *
      * <code>
      * $result = $app->execute(
-     *     function () use (Application $app):void {
+     *     function () use (ExecutionContext $execution):void {
      *
-     *         $test = $app->container()->get(Test::class);
+     *         $scope = $execution->scope();
+     *
+     *         $service = $scope->get(Test::class);
      *
      *         return '';
      *
@@ -444,12 +446,24 @@ final readonly class Application {
      * </p>
      *
      * @throws \FireHub\Kernel\Lifecycle\Exception\InvalidLifecycleStateException If the application is not available.
+     * @throws \FireHub\Application\Exception\InvalidApplicationStateException If the application is not initialized.
      *
      * @return mixed Operation result.
      */
     public function execute (Closure $callback):mixed {
 
-        $lease = $this->dependencyBoundary()->acquire();
+        try {
+
+            $lease = $this->dependencyBoundary()->acquire();
+
+        } catch (InvalidLifecycleStateException $exception) {
+
+            throw new InvalidApplicationStateException(
+                'Cannot execute an operation in the current application state.',
+                previous: $exception
+            );
+
+        }
 
         try {
 
@@ -457,13 +471,12 @@ final readonly class Application {
 
             try {
 
-                $context = new ExecutionContext(
-                    $this, $scope
+                return $callback(
+                    new ExecutionContext($this, $scope)
                 );
 
-                return $callback($context);
-
             } finally {
+
                 $scope->close();
 
             }
