@@ -13,9 +13,7 @@
 
 namespace FireHub\Application;
 
-use FireHub\Core\Boundary\ {
-    Container\Scope as ScopeBoundary, Container as ContainerBoundary
-};
+use FireHub\Core\Boundary\Container as ContainerBoundary;
 use FireHub\Kernel\Kernel;
 use FireHub\Kernel\Lifecycle\Engine;
 use FireHub\Kernel\Lifecycle\Dependency\Boundary;
@@ -415,7 +413,7 @@ final readonly class Application {
      *
      * <code>
      * $result = $app->execute(
-     *     function () use (Container $app):void {
+     *     function () use (Application $app):void {
      *
      *         $test = $app->container()->get(Test::class);
      *
@@ -430,7 +428,7 @@ final readonly class Application {
      * @uses \FireHub\Application\Application::dependencyBoundary() To acquire a lifecycle dependency.
      * @uses \FireHub\Kernel\Lifecycle\Dependency\Lease::release() To release the lifecycle dependency.
      *
-     * @param Closure(\FireHub\Core\Boundary\Container):mixed $callback <p>
+     * @param Closure(\FireHub\Application\Application):mixed $callback <p>
      * Operation to execute.
      * </p>
      *
@@ -444,7 +442,7 @@ final readonly class Application {
 
         try {
 
-            return $callback($this->container);
+            return $callback($this);
 
         } finally {
 
