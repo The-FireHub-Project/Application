@@ -411,10 +411,16 @@ final readonly class Application {
      *
      * The application must be initialized before execution begins.
      *
-     * Acquires an application lifecycle dependency to prevent disposal while the operation is active.
+     * Each execution creates a new dependency injection scope and execution context.
      *
-     * The dependency injection scope is closed, and the lifecycle dependency is released after execution, including
-     * when the callback fails.
+     * Scoped services are reused within the execution but remain isolated from other executions. Singleton services
+     * remain shared through the originating application container.
+     *
+     * Acquires an application lifecycle dependency to prevent disposal while execution is active.
+     *
+     * The execution scope is automatically closed after the callback completes, including when an exception is thrown.
+     *
+     * The lifecycle dependency is released after scope cleanup.
      *
      * <code>
      * $result = $app->execute(
@@ -433,7 +439,7 @@ final readonly class Application {
      * @uses \FireHub\Application\Application::dependencyBoundary() To acquire a lifecycle dependency.
      * @uses \FireHub\Kernel\Lifecycle\Dependency\Lease::release() To release the lifecycle dependency.
      *
-     * @param Closure(\FireHub\Application\Application):mixed $callback <p>
+     * @param Closure(\FireHub\Application\ExecutionContext):mixed $callback <p>
      * Operation to execute.
      * </p>
      *
@@ -447,7 +453,20 @@ final readonly class Application {
 
         try {
 
-            return $callback($this);
+            $scope = $this->container->createScope();
+
+            try {
+
+                $context = new ExecutionContext(
+                    $this, $scope
+                );
+
+                return $callback($context);
+
+            } finally {
+                $scope->close();
+
+            }
 
         } finally {
 
