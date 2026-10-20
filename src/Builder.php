@@ -13,9 +13,16 @@
 
 namespace FireHub\Application;
 
-use FireHub\Core\Boundary\Container as ContainerBoundary;
+use FireHub\Core\Boundary\ {
+    Container\Registrar, Container as ContainerBoundary
+};
+use FireHub\Core\Boundary\ {
+    Module\RegistersServices, Module
+};
 use FireHub\Container\Container;
 use FireHub\Kernel\Kernel;
+use FireHub\Module\Manager as ModuleManager;
+use FireHub\Application\Exception\ContainerRegistrationNotSupportedException;
 
 /**
  * ### Builds and configures FireHub applications
@@ -98,6 +105,12 @@ final class Builder {
      * @since 1.0.0
      */
     private ?ContainerBoundary $container = null;
+
+    /**
+     * ### Application module manager
+     * @since 1.0.0
+     */
+    private ?ModuleManager $modules = null;
 
     /**
      * ### Application initializer
@@ -193,6 +206,38 @@ final class Builder {
     }
 
     /**
+     * ### Registers an application module
+     *
+     * Adds a module to the application composition.
+     *
+     * Modules are identified by their fully qualified class names. Module dependencies are resolved during
+     * application construction.
+     *
+     * Service registrations contributed by modules are applied during the build process, before application
+     * initialization.
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Module\Manager::register() To register the module.
+     *
+     * @param \FireHub\Core\Boundary\Module $module <p>
+     * Application module.
+     * </p>
+     *
+     * @throws \FireHub\Module\Exception\ModuleAlreadyRegisteredException If the module is already registered.
+     *
+     * @return $this Current builder.
+     */
+    public function withModule (Module $module):self {
+
+        $this->modules ??= new ModuleManager;
+
+        $this->modules->register($module);
+
+        return $this;
+
+    }
+
+    /**
      * ### Registers an application initializer
      *
      * Adds an initializer to the application startup lifecycle.
@@ -251,26 +296,59 @@ final class Builder {
     /**
      * ### Builds an application
      *
-     * Creates a new application using the configured context, kernel, container, initializers, and disposers.
+     * Creates an application using the configured context, kernel, dependency injection container, modules,
+     * initializers, and disposers.
      *
-     * When no kernel or container has been explicitly configured, a new instance is created for the application.
+     * Module services are registered in dependency order before the application is constructed.
      *
-     * The resulting application remains in its created state. Kernel bootstrapping and application initialization
-     * must be performed separately.
+     * When the builder creates its own container, the container is automatically frozen after service registration.
+     *
+     * Externally supplied containers remain under the caller's control and are never frozen by the builder.
+     *
+     * Building an application does not initialize its lifecycle.
      * @since 1.0.0
      *
-     * @uses
+     * @uses \FireHub\Module\Manager::ordered() To get the ordered module list.
+     * @uses \FireHub\Core\Boundary\Module\RegistersServices::register() To register services.
+     * @uses \FireHub\Container\Container::freeze() To freeze the container.
      *
      * @throws \FireHub\Application\Exception\InvalidApplicationStateException If registration is not allowed.
+     * @throws \FireHub\Module\Exception\ModuleDependencyNotFoundException If a required module is not registered.
+     * @throws \FireHub\Module\Exception\CircularModuleDependencyException If circular dependencies are detected.
+     * @throws \FireHub\Application\Exception\ContainerRegistrationNotSupportedException If the container does not
+     * support service registration.
      *
      * @return \FireHub\Application\Application Configured application.
      */
     public function build ():Application {
 
+        $container = $this->container ?? new Container;
+
+        if ($this->modules !== null) {
+
+            foreach ($this->modules->ordered() as $module) {
+
+                if (!$module instanceof RegistersServices)
+                    continue;
+
+                if (!$container instanceof Registrar)
+                    throw new ContainerRegistrationNotSupportedException(
+                        'The configured container does not support service registration.'
+                    );
+
+                $module->register($container);
+
+            }
+
+        }
+
+        if ($this->container === null && $container instanceof Container)
+            $container->freeze();
+
         $application = new Application(
             $this->context,
             $this->kernel ?? new Kernel,
-            $this->container ?? new Container
+            $container
         );
 
         foreach ($this->initializers as $entry)
