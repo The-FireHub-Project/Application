@@ -14,6 +14,7 @@
 namespace FireHub\Application;
 
 use FireHub\Kernel\Kernel;
+use FireHub\Container\Container;
 use FireHub\Application\Exception\ {
     ApplicationAlreadyRegisteredException, ApplicationKernelMismatchException, ApplicationNotFoundException,
     InvalidApplicationIdentifierException
@@ -343,6 +344,8 @@ final class Manager {
      *
      * @uses \FireHub\Kernel\Kernel::boot() To boot the kernel.
      * @uses \FireHub\Application\Application::initialize() To initialize the application.
+     * @uses \FireHub\Application\Application::container() To get the application container.
+     * @uses \FireHub\Container\Container::freeze() To freeze the container.
      *
      * @throws \FireHub\Kernel\Exception\InvalidKernelStateException If booting is not allowed.
      * @throws \FireHub\Kernel\Exception\KernelBootException If initialization fails.
@@ -352,6 +355,15 @@ final class Manager {
      * @return void
      */
     public function bootstrap ():void {
+
+        foreach ($this->applications as $application) {
+
+            $container = $application->container();
+
+            if ($container instanceof Container)
+                $container->freeze();
+
+        }
 
         $this->kernel->boot();
 
