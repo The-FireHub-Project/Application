@@ -22,27 +22,36 @@ use FireHub\Core\Boundary\ {
 use FireHub\Container\Container;
 use FireHub\Kernel\Kernel;
 use FireHub\Module\Manager as ModuleManager;
-use FireHub\Application\Exception\ContainerRegistrationNotSupportedException;
+use FireHub\Application\Exception\{
+    ApplicationAlreadyRegisteredException, ApplicationKernelMismatchException,
+    ContainerRegistrationNotSupportedException, InvalidApplicationIdentifierException, UnmanagedApplicationBuilderException
+};
 
 /**
  * ### Builds and configures FireHub applications
  *
- * Provides a fluent API for assembling an application from its context, kernel, dependency injection container, and
- * lifecycle components.
+ * Provides a fluent API for assembling applications from their context, kernel, dependency injection container,
+ * modules, and lifecycle components.
  *
- * The builder separates application construction from runtime lifecycle management. Building an application does not
- * boot its kernel, initialize the application, or execute any operations.
+ * The builder supports both standalone and managed application construction. Standalone builders are created using
+ * create(), while managed builders are associated with an application manager and registration identifier.
  *
- * A kernel and container are created automatically when no explicit instances are provided.
+ * Building an application does not boot its kernel, initialize the application, or execute any operations.
+ * Managed builders additionally support registering constructed applications with their associated manager.
  *
- * Each build operation creates a new application instance. Explicitly configured kernel and container instances are
- * shared between builds, while default instances are created independently for each application.
+ * A kernel and container are created automatically when no explicit instances are provided. Managed applications
+ * inherit the shared kernel of their application manager.
+ *
+ * Each build operation creates a new application instance. Explicitly configured kernel and container instances
+ * are shared between builds, while default instances are created independently for standalone applications.
  *
  * <code>
+ * use FireHub\Application\Application;
  * use FireHub\Application\Builder;
  * use FireHub\Application\Context;
  * use FireHub\Application\Context\Name;
  * use FireHub\Application\Context\Environment;
+ * use FireHub\Application\ExecutionContext;
  * use FireHub\Container\Container;
  * use FireHub\Kernel\Kernel;
  *
@@ -58,8 +67,9 @@ use FireHub\Application\Exception\ContainerRegistrationNotSupportedException;
  *         Environment::PRODUCTION
  *     ))->withKernel($kernel)
  *     ->withContainer($container)
- *     ->withInitializer(new ClassThatImplementsInitializer)
- *     ->withDisposer(new ClassThatImplementsDisposer)
+ *     ->withModule(new AppModule)
+ *     ->withInitializer(new AppInitializer)
+ *     ->withDisposer(new AppDisposer)
  *     ->build();
  *
  * $kernel->boot();
@@ -67,9 +77,9 @@ use FireHub\Application\Exception\ContainerRegistrationNotSupportedException;
  *
  * try {
  *
- *     $app->execute(function (Application $app):void {
+ *     $app->execute(function (ExecutionContext $execution):void {
  *
- *         $service = $app->container()->get(MyService::class);
+ *         $service = $execution->scope()->get(MyService::class);
  *
  *         $service->run();
  *
@@ -93,6 +103,20 @@ use FireHub\Application\Exception\ContainerRegistrationNotSupportedException;
  * @since 1.0.0
  */
 final class Builder {
+
+    /**
+     * ### Application manager
+     * @since 1.0.0
+     */
+    private ?Manager $manager = null;
+
+    /**
+     * ### Application registration identifier
+     * @since 1.0.0
+     *
+     * @var null|non-empty-string
+     */
+    private ?string $registration_id = null;
 
     /**
      * ### Application kernel
@@ -161,6 +185,47 @@ final class Builder {
     }
 
     /**
+     * ### Creates a managed application builder
+     *
+     * Creates an application builder associated with the specified manager and registration identifier.
+     *
+     * Managed applications inherit the manager's shared kernel.
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Application\Manager::kernel() To get the application kernel.
+     *
+     * @param \FireHub\Application\Context $context <p>
+     * Application context.
+     * </p>
+     * @param \FireHub\Application\Manager $manager <p>
+     * Application manager.
+     * </p>
+     * @param non-empty-string $id <p>
+     * Application registration identifier.
+     * </p>
+     *
+     * @throws \FireHub\Application\Exception\InvalidApplicationIdentifierException If the identifier is empty.
+     *
+     * @return self Managed application builder.
+     */
+    public static function managed (Context $context, Manager $manager, string $id):self {
+
+        if ($id === '')
+            throw new InvalidApplicationIdentifierException(
+                'Application identifier cannot be empty.'
+            );
+
+        $builder = new self($context);
+
+        $builder->manager = $manager;
+        $builder->registration_id = $id;
+        $builder->kernel = $manager->kernel();
+
+        return $builder;
+
+    }
+
+    /**
      * ### Configures the application kernel
      *
      * Sets the kernel associated with applications created by this builder.
@@ -168,13 +233,21 @@ final class Builder {
      * The specified kernel may be shared between multiple applications.
      * @since 1.0.0
      *
+     * @uses \FireHub\Application\Manager::kernel() To get the application kernel.
+     *
      * @param \FireHub\Kernel\Kernel $kernel <p>
      * Application kernel.
      * </p>
      *
+     * @throws \FireHub\Application\Exception\ApplicationKernelMismatchException If the kernel is not shared with the
+     * manager.
+     *
      * @return $this Current builder.
      */
     public function withKernel (Kernel $kernel):self {
+
+        if ($this->manager !== null && $kernel !== $this->manager->kernel())
+            throw new ApplicationKernelMismatchException;
 
         $this->kernel = $kernel;
 
@@ -224,6 +297,7 @@ final class Builder {
      * </p>
      *
      * @throws \FireHub\Module\Exception\ModuleAlreadyRegisteredException If the module is already registered.
+     * @throws \FireHub\Module\Exception\ModuleManagerFrozenException If the manager is frozen.
      *
      * @return $this Current builder.
      */
@@ -369,6 +443,60 @@ final class Builder {
                 $entry['disposer'],
                 $entry['order']
             );
+
+        return $application;
+
+    }
+
+    /**
+     * ### Builds and registers an application
+     *
+     * Constructs the application and registers it with the associated application manager.
+     *
+     * Registration is available only for builders created through Builder::managed().
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Application\Builder::build() To construct the application.
+     * @uses \FireHub\Application\Manager::register() To register the application.
+     * @uses \FireHub\Application\Manager::has() To check if the application is already registered.
+     *
+     * @throws \FireHub\Application\Exception\UnmanagedApplicationBuilderException If the builder is not associated
+     * with a manager.
+     * @throws \FireHub\Application\Exception\ApplicationAlreadyRegisteredException If the identifier is already
+     * registered.
+     * @throws \FireHub\Application\Exception\InvalidApplicationStateException If registration is not allowed.
+     * @throws \FireHub\Module\Exception\ModuleDependencyNotFoundException If a required module is not registered.
+     * @throws \FireHub\Module\Exception\CircularModuleDependencyException If circular dependencies are detected.
+     * @throws \FireHub\Application\Exception\ContainerRegistrationNotSupportedException If the container does not
+     * support service registration.
+     * @throws \FireHub\Application\Exception\InvalidApplicationIdentifierException If the identifier is empty.
+     * @throws \FireHub\Application\Exception\ApplicationAlreadyRegisteredException If the application is already
+     * registered.
+     * @throws \FireHub\Application\Exception\ApplicationKernelMismatchException If the application kernel does not
+     * match the manager kernel.
+     *
+     * @return \FireHub\Application\Application Registered application.
+     */
+    public function register ():Application {
+
+        if ($this->manager === null || $this->registration_id === null)
+            throw new UnmanagedApplicationBuilderException(
+                'Cannot register an application using a standalone builder.',
+                context: [
+                    'manager' => $this->manager,
+                    'registration_id' => $this->registration_id,
+                ]
+            );
+
+        if ($this->manager->has($this->registration_id))
+            throw new ApplicationAlreadyRegisteredException;
+
+        $application = $this->build();
+
+        $this->manager->register(
+            $this->registration_id,
+            $application
+        );
 
         return $application;
 
