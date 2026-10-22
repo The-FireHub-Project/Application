@@ -107,7 +107,7 @@ final readonly class Application {
      * @param \FireHub\Module\Manager $modules [optional] <p>
      * Application module manager.
      * </p>
-     * @param bool $ownsContainer [optional] <p>
+     * @param bool $owns_container [optional] <p>
      * Whether ownership of the provided container is transferred to the application.
      * </p>
      *
@@ -118,12 +118,12 @@ final readonly class Application {
         private Kernel $kernel = new Kernel,
         ?ContainerBoundary $container = null,
         private ModuleManager $modules = new ModuleManager,
-        bool $ownsContainer = false
+        bool $owns_container = false
     ) {
 
         $this->container = $container ?? new Container;
 
-        $this->owns_container = $container === null || $ownsContainer;
+        $this->owns_container = $container === null || $owns_container;
 
         $this->lifecycle = new Engine(
             State::CREATED,

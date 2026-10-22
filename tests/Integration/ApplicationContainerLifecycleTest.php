@@ -167,7 +167,7 @@ final class ApplicationContainerLifecycleTest extends FireHubTestCase {
             context: $this->context(),
             kernel: $kernel,
             container: $container,
-            ownsContainer: true
+            owns_container: true
         );
 
         $kernel->boot();
@@ -220,7 +220,7 @@ final class ApplicationContainerLifecycleTest extends FireHubTestCase {
             context: $this->context(),
             kernel: $kernel,
             container: $container,
-            ownsContainer: true
+            owns_container: true
         );
 
         $kernel->boot();
@@ -264,7 +264,7 @@ final class ApplicationContainerLifecycleTest extends FireHubTestCase {
         $application = new Application(
             context: $this->context(),
             container: $container,
-            ownsContainer: true
+            owns_container: true
         );
 
         $container->get(SingletonLifecycleService::class);
@@ -312,7 +312,7 @@ final class ApplicationContainerLifecycleTest extends FireHubTestCase {
         $application = new Application(
             context: $this->context(),
             container: $container,
-            ownsContainer: true
+            owns_container: true
         );
 
         $container->get(SingletonLifecycleService::class);
