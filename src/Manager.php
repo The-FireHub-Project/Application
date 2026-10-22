@@ -442,6 +442,9 @@ final class Manager {
      *
      * Boots the shared kernel and initializes all registered applications in registration order.
      *
+     * Application-owned containers are configured and frozen during application construction. Externally supplied
+     * containers remain under the caller's control.
+     *
      * Each application retains its independent lifecycle state while sharing the same kernel.
      *
      * <code>
@@ -462,10 +465,8 @@ final class Manager {
      *
      * @since 1.0.0
      *
-     * @uses \FireHub\Kernel\Kernel::boot() To boot the kernel.
      * @uses \FireHub\Application\Application::initialize() To initialize the application.
      * @uses \FireHub\Application\Application::container() To get the application container.
-     * @uses \FireHub\Container\Container::freeze() To freeze the container.
      *
      * @throws \FireHub\Kernel\Exception\InvalidKernelStateException If booting is not allowed.
      * @throws \FireHub\Kernel\Exception\KernelBootException If initialization fails.
@@ -475,15 +476,6 @@ final class Manager {
      * @return void
      */
     public function bootstrap ():void {
-
-        foreach ($this->applications as $application) {
-
-            $container = $application->container();
-
-            if ($container instanceof Container)
-                $container->freeze();
-
-        }
 
         $this->kernel->boot();
 

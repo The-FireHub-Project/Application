@@ -25,7 +25,7 @@ use FireHub\Kernel\Lifecycle\Exception\ {
 use FireHub\Application\Exception\ {
     ApplicationDisposalException, ApplicationInitializationException, InvalidApplicationStateException
 };
-use Closure;
+use Closure, Throwable;
 
 /**
  * ### Manages the application lifecycle
@@ -78,6 +78,18 @@ final readonly class Application {
     private Engine $lifecycle;
 
     /**
+     * ### Application dependency injection container
+     * @since 1.0.0
+     */
+    private ContainerBoundary $container;
+
+    /**
+     * ### Whether the application owns its container
+     * @since 1.0.0
+     */
+    private bool $owns_container;
+
+    /**
      * ### Constructor
      * @since 1.0.0
      *
@@ -89,11 +101,14 @@ final readonly class Application {
      * @param \FireHub\Kernel\Kernel $kernel [optional] <p>
      * Parent kernel. A new kernel is created by default.
      * </p>
-     * @param \FireHub\Core\Boundary\Container $container [optional] <p>
+     * @param null|\FireHub\Core\Boundary\Container $container [optional] <p>
      * Application dependency injection container. A new container is created by default.
      * </p>
      * @param \FireHub\Module\Manager $modules [optional] <p>
      * Application module manager.
+     * </p>
+     * @param bool $ownsContainer [optional] <p>
+     * Whether ownership of the provided container is transferred to the application.
      * </p>
      *
      * @return void
@@ -101,9 +116,14 @@ final readonly class Application {
     public function __construct (
         private Context $context,
         private Kernel $kernel = new Kernel,
-        private ContainerBoundary $container = new Container,
-        private ModuleManager $modules = new ModuleManager
+        ?ContainerBoundary $container = null,
+        private ModuleManager $modules = new ModuleManager,
+        bool $ownsContainer = false
     ) {
+
+        $this->container = $container ?? new Container;
+
+        $this->owns_container = $container === null || $ownsContainer;
 
         $this->lifecycle = new Engine(
             State::CREATED,
@@ -359,7 +379,7 @@ final readonly class Application {
      *
      * @uses \FireHub\Kernel\Lifecycle\Engine::state() To get the current state.
      * @uses \FireHub\Kernel\Lifecycle\Engine::execute() To execute a callback.
-     * @uses \FireHub\Kernel\Lifecycle\Engine::stop() To execute registered disposers.
+     * @uses \FireHub\Application\Application::disposeResources() To dispose application resources.
      *
      * @throws \FireHub\Application\Exception\InvalidApplicationStateException If disposal is not allowed.
      * @throws \FireHub\Application\Exception\ApplicationDisposalException If a disposer fails.
@@ -373,7 +393,7 @@ final readonly class Application {
         try {
 
             $this->lifecycle->execute(
-                callback: fn() => $this->lifecycle->stop(),
+                callback: fn() => $this->disposeResources(),
                 from: [
                     State::CREATED,
                     State::INITIALIZED,
@@ -608,6 +628,55 @@ final readonly class Application {
     public function modules ():ModuleManager {
 
         return $this->modules;
+
+    }
+
+    /**
+     * ### Disposes application resources
+     *
+     * Executes registered application disposers and closes the application-owned dependency injection container.
+     *
+     * Container shutdown is attempted even when an application disposer fails. Externally owned containers are not
+     * closed.
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Kernel\Lifecycle\Engine::stop() To execute registered disposers.
+     * @uses \FireHub\Container\Container::close() To close the owned container.
+     *
+     * @throws Throwable If application disposal or container shutdown fails.
+     *
+     * @return void
+     */
+    private function disposeResources ():void {
+
+        $failure = null;
+
+        try {
+
+            $this->lifecycle->stop();
+
+        } catch (Throwable $exception) {
+
+            $failure = $exception;
+
+        }
+
+        if ($this->owns_container && $this->container instanceof Container) {
+
+            try {
+
+                $this->container->close();
+
+            } catch (Throwable $exception) {
+
+                $failure ??= $exception;
+
+            }
+
+        }
+
+        if ($failure !== null)
+            throw $failure;
 
     }
 

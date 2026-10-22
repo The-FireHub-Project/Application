@@ -397,10 +397,13 @@ final class Builder {
      * @throws \FireHub\Module\Exception\CircularModuleDependencyException If circular dependencies are detected.
      * @throws \FireHub\Application\Exception\ContainerRegistrationNotSupportedException If the container does not
      * support service registration.
+     * @throws \FireHub\Container\Exception\ContainerClosedException If the container is closed.
      *
      * @return \FireHub\Application\Application Configured application.
      */
     public function build ():Application {
+
+        $owns_container = $this->container === null;
 
         $container = $this->container ?? new Container;
 
@@ -429,7 +432,8 @@ final class Builder {
             $this->context,
             $this->kernel ?? new Kernel,
             $container,
-            $modules
+            $modules,
+            $owns_container
         );
 
         foreach ($this->initializers as $entry)
@@ -474,6 +478,7 @@ final class Builder {
      * registered.
      * @throws \FireHub\Application\Exception\ApplicationKernelMismatchException If the application kernel does not
      * match the manager kernel.
+     * @throws \FireHub\Container\Exception\ContainerClosedException If the container is closed.
      *
      * @return \FireHub\Application\Application Registered application.
      */
