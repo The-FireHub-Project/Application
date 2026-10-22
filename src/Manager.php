@@ -20,6 +20,7 @@ use FireHub\Application\Exception\ {
     InvalidApplicationIdentifierException
 };
 use FireHub\Runtime;
+use Throwable;
 
 /**
  * ### Manages multiple FireHub applications
@@ -122,7 +123,26 @@ final class Manager {
      * The builder allows additional application configuration before construction.
      *
      * Building the application does not automatically register it with the manager.
-     * @since 1.0.0
+     *
+     * <code>
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     * use FireHub\Application\Manager;
+     *
+     * $manager = new Manager;
+     *
+     * $builder = $manager->create(
+     *     new Context(
+     *         new Name('frontend'),
+     *         Environment::PRODUCTION
+     *     )
+     * );
+     *
+     * $application = $builder->build();
+     * </code>
+     *
+     * @since 1.0.9
      *
      * @uses \FireHub\Application\Builder::create() To create the application builder.
      * @uses \FireHub\Application\Builder::withKernel() To configure the shared kernel.
@@ -148,6 +168,24 @@ final class Manager {
      * Creates a builder associated with this manager and assigns the specified registration identifier.
      *
      * The resulting builder can register the constructed application directly with this manager.
+     *
+     * <code>
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     * use FireHub\Application\Manager;
+     *
+     * $manager = new Manager;
+     *
+     * $application = $manager->application(
+     *     'frontend',
+     *     new Context(
+     *         new Name('Frontend'),
+     *         Environment::PRODUCTION
+     *     )
+     * )->register();
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Application\Builder::managed() To create the application builder.
@@ -175,6 +213,27 @@ final class Manager {
      * Registers an application under the specified identifier.
      *
      * The application must use the same kernel as this manager.
+     *
+     * <code>
+     * use FireHub\Application\Application;
+     * use FireHub\Application\Context;
+     * use FireHub\Application\Context\Name;
+     * use FireHub\Application\Context\Environment;
+     * use FireHub\Application\Manager;
+     *
+     * $manager = new Manager;
+     *
+     * $application = new Application(
+     *     new Context(
+     *         new Name('Frontend'),
+     *         Environment::PRODUCTION
+     *     ),
+     *     $manager->kernel()
+     * );
+     *
+     * $manager->register('frontend', $application);
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Application\Application::kernel() To get the application kernel.
@@ -220,6 +279,13 @@ final class Manager {
 
     /**
      * ### Gets a registered application
+     *
+     * <code>
+     * $application = $manager->get('frontend');
+     *
+     * $application->initialize();
+     * </code>
+     *
      * @since 1.0.0
      *
      * @param non-empty-string $id <p>
@@ -239,6 +305,15 @@ final class Manager {
 
     /**
      * ### Checks whether an application is registered
+     *
+     * <code>
+     * if ($manager->has('frontend')) {
+     *
+     *     $application = $manager->get('frontend');
+     *
+     * }
+     * </code>
+     *
      * @since 1.0.0
      *
      * @param non-empty-string $id <p>
@@ -255,6 +330,15 @@ final class Manager {
 
     /**
      * ### Gets all registered applications
+     *
+     * <code>
+     * foreach ($manager->all() as $id => $application) {
+     *
+     *     echo $id;
+     *
+     * }
+     * </code>
+     *
      * @since 1.0.0
      *
      * @return array<string, \FireHub\Application\Application> Registered applications.
@@ -267,6 +351,13 @@ final class Manager {
 
     /**
      * ### Gets the shared kernel
+     *
+     * <code>
+     * $kernel = $manager->kernel();
+     *
+     * $kernel->boot();
+     * </code>
+     *
      * @since 1.0.0
      *
      * @return \FireHub\Kernel\Kernel Shared application kernel.
@@ -281,6 +372,13 @@ final class Manager {
      * ### Initializes a registered application
      *
      * Boots the shared kernel if necessary and initializes the specified application.
+     *
+     * <code>
+     * $manager->initialize('frontend');
+     *
+     * $application = $manager->get('frontend');
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Application\Manager::get() To get the application.
@@ -313,6 +411,11 @@ final class Manager {
      * ### Disposes a registered application
      *
      * Disposes the specified application without shutting down the shared kernel.
+     *
+     * <code>
+     * $manager->dispose('frontend');
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Application\Manager::get() To get the application.
@@ -340,6 +443,23 @@ final class Manager {
      * Boots the shared kernel and initializes all registered applications in registration order.
      *
      * Each application retains its independent lifecycle state while sharing the same kernel.
+     *
+     * <code>
+     * $manager->bootstrap();
+     *
+     * $frontend = $manager->get('frontend');
+     *
+     * $frontend->execute(
+     *     static function (ExecutionContext $execution):void {
+     *
+     *         $service = $execution->scope()->get(MyService::class);
+     *
+     *         $service->run();
+     *
+     *     }
+     * );
+     * </code>
+     *
      * @since 1.0.0
      *
      * @uses \FireHub\Kernel\Kernel::boot() To boot the kernel.
@@ -375,38 +495,116 @@ final class Manager {
     /**
      * ### Shuts down all managed applications and the shared kernel
      *
-     * Disposes all registered applications in reverse registration order and subsequently shuts down the shared kernel.
+     * Disposes registered applications in reverse registration order and subsequently shuts down the shared kernel.
      *
-     * The kernel shutdown is attempted even if application disposal fails.
+     * All applications are attempted even when individual disposal operations fail. Kernel shutdown is always attempted
+     * after application disposal.
      *
-     * Application disposal must be complete before the kernel is shut down because applications may depend on kernel
-     * services during their disposal lifecycle.
+     * The first encountered failure is propagated after all shutdown operations have been attempted.
+     *
+     * <code>
+     * $manager->bootstrap();
+     *
+     * try {
+     *
+     *     $manager->get('frontend')->execute(
+     *         static function (ExecutionContext $execution):void {
+     *
+     *             $service = $execution->scope()->get(MyService::class);
+     *
+     *             $service->run();
+     *
+     *         }
+     *     );
+     *
+     * } finally {
+     *
+     *     $manager->shutdown();
+     *
+     * }
+     * </code>
+     *
      * @since 1.0.0
      *
-     * @uses \FireHub\Application\Application::dispose() To dispose the application.
-     * @uses \FireHub\Runtime\Arr\Transform::reverse() To reverse the application registration order.
-     * @uses \FireHub\Kernel\Kernel::shutdown() To shutdown the kernel.
+     * @uses \FireHub\Application\Manager::disposeApplications() To dispose registered applications.
+     * @uses \FireHub\Application\Manager::shutdownKernel() To shut down the shared kernel.
      *
-     * @throws \FireHub\Kernel\Exception\InvalidKernelStateException If shutdown is not allowed.
-     * @throws \FireHub\Kernel\Exception\KernelShutdownException If termination fails.
-     * @throws \FireHub\Application\Exception\InvalidApplicationStateException If disposal is not allowed.
-     * @throws \FireHub\Application\Exception\ApplicationDisposalException If a disposer fails.
+     * @throws Throwable If application disposal or kernel shutdown fails.
      *
      * @return void
      */
     public function shutdown ():void {
 
-        try {
+        $failure = $this->disposeApplications();
 
-            foreach (Runtime\Arr\Transform::reverse($this->applications) as $application)
+        $this->shutdownKernel($failure);
+
+        if ($failure !== null)
+            throw $failure;
+
+    }
+
+    /**
+     * ### Disposes all registered applications
+     *
+     * Attempts application disposal in reverse registration order.
+     *
+     * Disposal continues when an application fails, preserving the first encountered exception.
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Application\Application::dispose() To dispose an application.
+     * @uses \FireHub\Runtime\Arr\Transform::reverse() To reverse application registration order.
+     *
+     * @return null|Throwable First disposal failure, or null if all applications were disposed successfully.
+     */
+    private function disposeApplications ():?Throwable {
+
+        $failure = null;
+
+        foreach (Runtime\Arr\Transform::reverse($this->applications) as $application) {
+
+            try {
+
                 $application->dispose();
 
-            } finally {
+            } catch (Throwable $exception) {
 
-                $this->kernel->shutdown();
+                $failure ??= $exception;
 
             }
 
         }
+
+        return $failure;
+
+    }
+
+    /**
+     * ### Shuts down the shared kernel
+     *
+     * Attempts kernel shutdown and captures its failure when no previous shutdown failure exists.
+     * @since 1.0.0
+     *
+     * @uses \FireHub\Kernel\Kernel::shutdown() To shut down the shared kernel.
+     *
+     * @param null|Throwable $failure <p>
+     * First encountered shutdown failure.
+     * </p>
+     *
+     * @return void
+     */
+    private function shutdownKernel (?Throwable &$failure):void {
+
+        try {
+
+            $this->kernel->shutdown();
+
+        } catch (Throwable $exception) {
+
+            $failure ??= $exception;
+
+        }
+
+    }
 
 }
