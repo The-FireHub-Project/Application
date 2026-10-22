@@ -15,7 +15,7 @@ namespace FireHub\Tests\Application\Integration;
 
 use FireHub\Testing\FireHubTestCase;
 use FireHub\Application\ {
-    Application, Context, Disposer, Manager, State
+    Application, Context, Disposer, Initializer, Manager, State
 };
 use FireHub\Application\Context\ {
     Environment, Name
@@ -24,7 +24,9 @@ use FireHub\Container\Container;
 use FireHub\Kernel\ {
     Kernel, Terminator
 };
-use FireHub\Application\Exception\ApplicationDisposalException;
+use FireHub\Application\Exception\ {
+    ApplicationDisposalException, ApplicationInitializationException
+};
 use FireHub\Tests\Application\Stubs\LifecycleEvents;
 use PHPUnit\Framework\Attributes\ {
     CoversClass, Group, Medium
@@ -350,6 +352,150 @@ final class ManagerShutdownTest extends FireHubTestCase {
             $frontendContainer,
             $backendContainer
         );
+
+    }
+
+    /**
+     * ### Shuts down all applications after partial bootstrap failure
+     * @since 1.0.0
+     *
+     * @return void
+     */
+    public function testShutdownAfterPartialBootstrapFailure ():void {
+
+        $events = new LifecycleEvents;
+
+        $kernel = new Kernel;
+
+        $kernel->registerTerminator(
+            new class($events) implements Terminator {
+
+                public function __construct (
+                    private LifecycleEvents $events
+                ) {}
+
+                public function terminate ():void {
+
+                    $this->events->entries[] = 'kernel';
+
+                }
+
+            }
+        );
+
+        $manager = new Manager($kernel);
+
+        $frontend = $manager->application(
+            'frontend',
+            $this->context('frontend')
+        )->withInitializer(
+            new class($events) implements Initializer {
+
+                public function __construct (
+                    private LifecycleEvents $events
+                ) {}
+
+                public function initialize (Application $application):void {
+
+                    $this->events->entries[] = 'frontend.initialize';
+
+                }
+
+            }
+        )->withDisposer(
+            new class($events) implements Disposer {
+
+                public function __construct (
+                    private LifecycleEvents $events
+                ) {}
+
+                public function dispose (Application $application):void {
+
+                    $this->events->entries[] = 'frontend.dispose';
+
+                }
+
+            }
+        )->register();
+
+        $backend = $manager->application(
+            'backend',
+            $this->context('backend')
+        )->withInitializer(
+            new class($events) implements Initializer {
+
+                public function __construct (
+                    private LifecycleEvents $events
+                ) {}
+
+                public function initialize (Application $application):void {
+
+                    $this->events->entries[] = 'backend.initialize';
+
+                    throw new RuntimeException('Backend initialization failed.');
+
+                }
+
+            }
+        )->withDisposer(
+            new class($events) implements Disposer {
+
+                public function __construct (
+                    private LifecycleEvents $events
+                ) {}
+
+                public function dispose (Application $application):void {
+
+                    $this->events->entries[] = 'backend.dispose';
+
+                }
+
+            }
+        )->register();
+
+        $bootstrapFailure = null;
+
+        try {
+
+            $manager->bootstrap();
+
+        } catch (ApplicationInitializationException $exception) {
+
+            $bootstrapFailure = $exception;
+
+        } finally {
+
+            $manager->shutdown();
+
+        }
+
+        self::assertInstanceOf(
+            ApplicationInitializationException::class,
+            $bootstrapFailure
+        );
+
+        self::assertSame(
+            [
+                'frontend.initialize',
+                'backend.initialize',
+                'backend.dispose',
+                'frontend.dispose',
+                'kernel'
+            ],
+            $events->entries
+        );
+
+        self::assertSame(State::DISPOSED, $frontend->state());
+        self::assertSame(State::DISPOSED, $backend->state());
+
+        $frontendContainer = $frontend->container();
+        $backendContainer = $backend->container();
+
+        self::assertInstanceOf(Container::class, $frontendContainer);
+        self::assertInstanceOf(Container::class, $backendContainer);
+
+        self::assertTrue($frontendContainer->isClosed());
+        self::assertTrue($backendContainer->isClosed());
 
     }
 
