@@ -23,6 +23,11 @@ use FireHub\Core\Exception\Runtime\OutOfBoundsException;
  */
 final class ApplicationNotFoundException extends OutOfBoundsException {
 
+    /**
+     * @inheritDoc
+     *
+     * @since 1.0.0
+     */
     protected const string DEFAULT_MESSAGE = 'The application was not found';
 
 }

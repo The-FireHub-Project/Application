@@ -26,6 +26,11 @@ use FireHub\Core\Exception\Runtime\KernelException;
  */
 final class UnmanagedApplicationBuilderException extends KernelException {
 
+    /**
+     * @inheritDoc
+     *
+     * @since 1.0.0
+     */
     protected const string DEFAULT_MESSAGE = 'The application builder is not managed';
 
 }

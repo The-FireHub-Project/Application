@@ -24,6 +24,11 @@ use FireHub\Core\Exception\Runtime\InvalidArgumentException;
  */
 final class ApplicationKernelMismatchException extends InvalidArgumentException {
 
+    /**
+     * @inheritDoc
+     *
+     * @since 1.0.0
+     */
     protected const string DEFAULT_MESSAGE = 'The application kernel does not match the application manager kernel';
 
 }

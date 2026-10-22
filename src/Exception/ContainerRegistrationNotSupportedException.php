@@ -24,6 +24,11 @@ use FireHub\Core\Exception\RuntimeException;
  */
 final class ContainerRegistrationNotSupportedException extends RuntimeException {
 
+    /**
+     * @inheritDoc
+     *
+     * @since 1.0.0
+     */
     protected const string DEFAULT_MESSAGE = 'The configured dependency injection container does not support service registration';
 
 }

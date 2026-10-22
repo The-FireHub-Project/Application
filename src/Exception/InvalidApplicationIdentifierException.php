@@ -23,6 +23,11 @@ use FireHub\Core\Exception\Runtime\InvalidArgumentException;
  */
 final class InvalidApplicationIdentifierException extends InvalidArgumentException {
 
+    /**
+     * @inheritDoc
+     *
+     * @since 1.0.0
+     */
     protected const string DEFAULT_MESSAGE = 'The application identifier is invalid';
 
 }

@@ -27,6 +27,11 @@ use FireHub\Core\Exception\RuntimeException;
  */
 final class ApplicationDisposalException extends RuntimeException {
 
+    /**
+     * @inheritDoc
+     *
+     * @since 1.0.0
+     */
     protected const string DEFAULT_MESSAGE = 'The application failed to dispose';
 
 }
