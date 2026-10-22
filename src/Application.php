@@ -402,7 +402,6 @@ final readonly class Application {
                 success: State::DISPOSED,
                 failure: State::DISPOSAL_FAILED,
                 entering: State::DISPOSING,
-                acquire_parent: true,
                 release_parent: true,
                 require_no_dependents: true
             );
