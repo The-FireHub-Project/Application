@@ -386,8 +386,10 @@ final class Builder {
      * @since 1.0.0
      *
      * @uses \FireHub\Module\Manager::ordered() To get the ordered module list.
+     * @uses \FireHub\Module\Manager::hasServiceRegistrations() To check if the module manager has service
+     * registrations.
+     * @uses \FireHub\Module\Manager::registerServices() To register services in the container.
      * @uses \FireHub\Module\Manager::freeze() To freeze the module registry.
-     * @uses \FireHub\Core\Boundary\Module\RegistersServices::register() To register services.
      * @uses \FireHub\Container\Container::freeze() To freeze the container.
      * @uses \FireHub\Application\Application::registerInitializer() To register application initializers.
      * @uses \FireHub\Application\Application::registerDisposer() To register application disposers.
@@ -409,17 +411,18 @@ final class Builder {
 
         $modules = clone ($this->modules ?? new ModuleManager);
 
-        foreach ($modules->ordered() as $module) {
-
-            if (!$module instanceof RegistersServices)
-                continue;
+        if ($modules->hasServiceRegistrations()) {
 
             if (!$container instanceof Registrar)
                 throw new ContainerRegistrationNotSupportedException(
                     'The configured container does not support service registration.'
                 );
 
-            $module->register($container);
+            $modules->registerServices($container);
+
+        } else {
+
+            $modules->ordered();
 
         }
 
