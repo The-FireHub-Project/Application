@@ -458,6 +458,9 @@ final readonly class Application {
      * @since 1.0.0
      *
      * @uses \FireHub\Application\Application::dependencyBoundary() To acquire a lifecycle dependency.
+     * @uses \FireHub\Kernel\Lifecycle\Dependency\Boundary::acquire() To acquire the lifecycle dependency.
+     * @uses \FireHub\Core\Boundary\Container\Scope::createScope() To create a dependency injection scope.
+     * @uses \FireHub\Container\Scope::close() To close the dependency injection scope.
      * @uses \FireHub\Kernel\Lifecycle\Dependency\Lease::release() To release the lifecycle dependency.
      *
      * @param Closure(\FireHub\Application\ExecutionContext):mixed $callback <p>
