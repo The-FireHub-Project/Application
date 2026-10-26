@@ -73,7 +73,7 @@ final readonly class Application {
      * ### Application lifecycle engine
      * @since 1.0.0
      *
-     * @var Engine<State>
+     * @var Engine<\FireHub\Application\State>
      */
     private Engine $lifecycle;
 
