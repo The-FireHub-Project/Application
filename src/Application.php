@@ -516,7 +516,7 @@ final readonly class Application {
      * No conversion from kernel states is performed.
      *
      * <code>
-     *  use FireHub\Application\Application;
+     * use FireHub\Application\Application;
      * use FireHub\Application\Context;
      * use FireHub\Application\Context\Name;
      * use FireHub\Application\Context\Environment;
