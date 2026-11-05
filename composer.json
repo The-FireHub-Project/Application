@@ -65,7 +65,10 @@
       "layer": "runtime",
       "edition": "standard",
       "role": "orchestration",
-      "criticality": "high"
+      "criticality": "high",
+      "ci": {
+        "php-versions": ["8.5"]
+      }
     }
   }
 }
