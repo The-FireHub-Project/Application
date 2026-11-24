@@ -16,9 +16,7 @@ namespace FireHub\Application;
 use FireHub\Core\Boundary\ {
     Container\Registrar, Container as ContainerBoundary
 };
-use FireHub\Core\Boundary\ {
-    Module\RegistersServices, Module
-};
+use FireHub\Core\Boundary\Module;
 use FireHub\Container\Container;
 use FireHub\Kernel\Kernel;
 use FireHub\Module\Manager as ModuleManager;
